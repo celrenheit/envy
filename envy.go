@@ -1,30 +1,17 @@
 package envy
 
-import "os"
+import (
+	"os"
+	"strings"
+)
 
 type EnvVarParser interface {
 	Parse() (string, bool)
 }
 
-type Modifier interface {
-	Modify(input string) (out string)
-}
+type Modifier func(input string) (out string)
 
-type Fusioner interface {
-	Fusion(vars ...string) string
-}
-
-type FusionerFunc func(vars ...string) string
-
-func (fn FusionerFunc) Fusion(vars ...string) string {
-	return fn(vars...)
-}
-
-type ModifierFunc func(input string) (out string)
-
-func (fn ModifierFunc) Modify(input string) string {
-	return fn(input)
-}
+type Fusioner func(vars ...string) string
 
 type EnvVar struct {
 	name     string
@@ -34,7 +21,7 @@ type EnvVar struct {
 func (ev *EnvVar) Parse() (string, bool) {
 	if val := os.Getenv(ev.name); val != "" {
 		if ev.modifier != nil {
-			return ev.modifier.Modify(val), true
+			return ev.modifier(val), true
 		}
 		return val, true
 	}
@@ -44,7 +31,7 @@ func (ev *EnvVar) Parse() (string, bool) {
 
 type FusionVar struct {
 	names  []string
-	merger Fusioner
+	fusion Fusioner
 }
 
 func (fv *FusionVar) Parse() (string, bool) {
@@ -57,7 +44,7 @@ func (fv *FusionVar) Parse() (string, bool) {
 		vals = append(vals, val)
 	}
 
-	if val := fv.merger.Fusion(vals...); val != "" {
+	if val := fv.fusion(vals...); val != "" {
 		return val, true
 	}
 
@@ -95,28 +82,11 @@ func (e *Envy) AddWithModifier(ev string, mod Modifier) *Envy {
 	return e
 }
 
-func (e *Envy) AddWithModifierFunc(ev string, modFn ModifierFunc) *Envy {
-	e.vars = append(e.vars, &EnvVar{
-		name:     ev,
-		modifier: ModifierFunc(modFn),
-	})
-	return e
-}
-
-func (e *Envy) Merge(merger Fusioner, names ...string) *Envy {
+func (e *Envy) Merge(fusionner Fusioner, names ...string) *Envy {
 	e.vars = append(e.vars, &FusionVar{
 		names:  names,
-		merger: merger,
+		fusion: fusionner,
 	})
-	return e
-}
-
-func (e *Envy) MergeFunc(mergerFn FusionerFunc, names ...string) *Envy {
-	e.vars = append(e.vars, &FusionVar{
-		names:  names,
-		merger: FusionerFunc(mergerFn),
-	})
-
 	return e
 }
 
@@ -137,4 +107,22 @@ func (e *Envy) GetenvOk() (string, bool) {
 	}
 
 	return "", false
+}
+
+func PrependWith(str string) Modifier {
+	return func(in string) string {
+		return str + in
+	}
+}
+
+func AppendWith(str string) Modifier {
+	return func(in string) string {
+		return in + str
+	}
+}
+
+func Join(s string) Fusioner {
+	return func(vals ...string) string {
+		return strings.Join(vals, s)
+	}
 }

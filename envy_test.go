@@ -24,9 +24,7 @@ func TestFusion(t *testing.T) {
 	os.Setenv("REDIS_PORT_6379_TCP_ADDR", "127.0.0.1")
 	os.Setenv("REDIS_PORT_6379_TCP_PORT", "6379")
 
-	res := New().MergeFunc(func(vals ...string) string {
-		return vals[0] + ":" + vals[1]
-	}, "REDIS_PORT_6379_TCP_ADDR", "REDIS_PORT_6379_TCP_PORT").
+	res := New().Merge(Join(":"), "REDIS_PORT_6379_TCP_ADDR", "REDIS_PORT_6379_TCP_PORT").
 		Getenv()
 
 	expected := "127.0.0.1:6379"
